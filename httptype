@@ -4,7 +4,7 @@
 #    
 #  httptype version 1.3.9cvs
 #
-#    Copyright (c) 2000-2001, Philip Tellis
+#    Copyright (c) 1999-2002, Philip Tellis
 #
 #    For copyright information: httptype --copyright
 #
@@ -283,7 +283,7 @@ sub version {
 
 sub copyright {
 	print <<EOF;
-  Copyright (c) 2000, Philip Tellis
+  Copyright (c) 1999-2002, Philip Tellis
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -331,6 +331,10 @@ sub getnexthost() {
 #			s/^[\s\t]*(.+?)[\s\t\r\n]*$/$1/;
 			s/^\s+//;
 			s/\s+$//;
+			if(m#^([a-z]+)://# && lc $1 ne 'http') {
+				warnnicely("Unsupported url scheme: $1, skipping");
+				next;
+			}
 			s#^http://##;
 			s#/.*$##;
 			tr/ ,/:/s;
