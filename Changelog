@@ -1,0 +1,155 @@
+5 October 2001
+version 1.3.8 (devel)
+
+- User may specify hostfile, url and host:port on the command line
+  all are considered.
+- Program now uses Getopt to parse arguments
+- Code cleanup and proper indentation added
+- Fixed bugs in man page
+
+6 April 2001
+version 1.3.7 (devel)
+
+- Added check for Servlet-Engine as well as Server - thanks to G. Vieri.
+- Added option to pass a url instead of host and port - suggested by
+  Dimi Shahbaz.
+- Converted a lot of regex matches into simple string matches.
+- Added /o switch to most regexes.
+
+1 October 2000
+version 1.3.6 (devel)
+
+- Added a timeout value for hosts - suggested by Josef Radinger.
+
+9 June 2000
+version 1.3.5 (devel)
+
+- Added a check to see whether the real hostname could be identified or
+  not.  In some cases (dns problem?) this caused $realname to be undefined
+  which caused a warning.
+- Better tracing with --trace switch.
+- Removed use of barewords as hash indexes.  This caused a warning on some
+  implementations.  I don't know why it didn't in mine.
+
+7 June 2000
+version 1.3.4 (devel)
+
+- Added --showreal option to display the real hostname.  This is useful
+  if you use the canonical name or an alias.
+- Added --showip option to display the IP address of the host.  If there
+  are multiple IP addresses, only the first will be returned.
+
+7 June 2000
+version 1.2.2 (stable)
+
+- Version 1.3.3 made stable to 1.2.2
+
+8 April 2000
+version 1.3.3 (devel)
+
+- Added default login name option for proxy authentication - Binand.
+
+25 March 2000
+version 1.3.2 (devel)
+
+- Added a fix for broken servers that do not respond to the HEAD method.
+  Thanks to Ed Sawicki for pointing me to http://www.walgreens.com/
+
+21 January 2000
+version 1.3.1 (devel)
+
+- Now prints a newline after accepting proxy authentication password from
+  user. This was a problem only in cases where stdout and stderr prints to
+  the same device.
+- Default proxy port of 80 is used if none is specified. If you think this
+  should be different, tell me what you think it should be and why.
+- Starts polling hosts as soon as it has at least one host to poll. The
+  earlier version would wait until the entire list of hosts was read from
+  standard input or a file. This was a problem if the input was large, or
+  generated on the fly.  The change reduces idle time.
+- Can now read from multiple host files. If a hostfile and a command line
+  host are both specified, the command line host is ignored.
+- Increased modularity by moving a lot more code into subroutines.
+
+
+13 January 2000
+version 1.3.0 (devel)
+
+- Added --debug and --trace switches for better error/bug detection
+- Better error messages
+- Added --serveronly switch to suppress display of information other than the
+  server type
+- Improved parsing of command line switches for improved error tolerance
+- Added a manual page - finally
+
+
+12 January 2000
+version 1.2.1 (stable)
+
+- Bug that caused program to die if http_proxy variable was not set - fixed
+  Thanks to Marco Giardini for pointing it out.
+
+
+11 January 2000
+version 1.2.0 (stable) [1.1.3 (devel)]
+
+- 1.1 development series made stable 
+- minor bug in 1.1.2 that caused display of `uninitialised variable' if the 
+  no_proxy environment variable had not been set fixed. Thanks to Subhas Roy
+  for pointing this out.
+
+
+5 January 2000
+version 1.1.2 (devel)
+
+- Fixed bug in parsing http_proxy variable
+- Added support for proxy authentication
+- Added support for no_proxy environment variable. Proxy server will not be
+  used for hosts included in this variable.
+
+
+2 January 2000
+version 1.1.1 (devel)
+
+- Fixed major bug that caused program to print `not a http host' for all 
+  hosts
+- Fixed bug that caused program to ignore port number if not separated from
+  host by a single colon or space
+- Fixed minor bugs that caused display of proxy instead of host name when
+  called with the --showinput switch
+- Changed format of proxy host specified through the --proxy switch
+- Added --noproxy switch which does the same job as --proxy none
+- Cut down the amount of help given through the --help switch. Detailed
+  help will be available in the manual page which is will come out soon.
+
+
+version 1.0.1 (stable)
+
+- Fixed bug that caused program to ignore port number if not separated from
+  host by a single colon or space
+- Fixed bug that caused program to hang if a valid but non-http port was 
+  specified.
+- Changed to using HEAD method instead of OPTIONS method.
+
+
+1 January 2000
+version 1.1.b (devel)
+
+- Added support for HTTP proxies thanks to Binand Raj S.
+- Fixed bug that caused program to hang if a valid but non-http port was 
+  specified.
+- Changed to using HEAD method instead of OPTIONS method.
+
+
+30th December 1999
+version 1.0.b (stable)
+Initial release version
+
+- Now reads from stdin or a file
+
+
+28th December 1999
+version 0.1.b (devel)
+Unreleased
+
+Reads one host from command line.

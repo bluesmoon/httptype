@@ -1,0 +1,54 @@
+This is version 1.3.8 of httptype
+=================================
+
+httptype is a program that returns the http host software of a website. It is
+written in Perl.
+
+Installation:
+
+Installation is simple. Just run make install. It requires Perl 5.003 to be
+installed, though it may well work with older versions of Perl.
+
+If you have problems running the program:
+
+If you have any problems, first try using the --trace and --debug switches.
+You can mail me that output along with a description of your problem. I will
+try and fix it when I have the time.
+
+Usage:
+
+For list of options:
+    httptype --help
+
+For detailed information see the man page:
+    man httptype
+
+If you find a use for this program, I would appreciate mail from you at:
+philip.tellis@iname.com
+
+Format of host file:
+
+    <hostfile>    ::= <comments>
+                      | <blank lines>
+                      | <host lines>
+    <string>      ::= <char> | <char><string>
+    <char>        ::= any of the 128 ASCII characters except <CR> and <LF>
+    <comments>    ::= '#' <string> <LF>
+    <blank str>   ::= <LWS> | <HTAB> | <LWS> <blank str> | <HTAB> <blank str>
+    <blank lines> ::= <blank str> <LF>
+    <hostname>    ::= <a FQDN or IP address of a HTTP host>
+    <port number> ::= <a numeric port number> 
+                      | <port name defined in services file>
+    <separator>   ::= <LWS> | ':' | ','
+    <host lines>  ::= <hostname> [<separator> <port number>] <LF>
+
+
+Author:
+
+httptype was written by Philip S Tellis.  The Copyright of this program
+lies with the author. The program is distributed under the GPL. The GNU
+General Public Licence is outlined in the file Copying that accompanies
+this package.
+
+Code for proxy support and Redhat packages supplied by Binand Raj S.
+

@@ -1,0 +1,291 @@
+.\"
+.\" Copyright (c) 2000-2001 Philip S Tellis <philip.tellis@iname.com>,
+.\"
+.TH httptype 1 "5 October 2001" "httptype 1.3.8" "httptype user manual"
+.SH NAME
+.B httptype v 1.3.8
+\- HTTP Server Type
+.SH SYNOPSIS
+.B httptype
+[OPTION]... [--] [HOST [PORT]]
+.PP
+Use "httptype --help" to display a complete list of current options.
+
+.SH DESCRIPTION
+httptype reads a list of http hosts and optionally the port number for each
+of these. It then queries each of the hosts and displays the http server
+software of the host on standard output.
+.PP
+Input may be read from a host file if specified using the --hosts switch:
+.I
+.sp
+    httptype --hosts [hostfile]
+
+.fi
+If hostfile is omitted or `-' httptype reads from standard input.
+.PP
+A single host may be queried by passing it's name on the command line:
+.I
+.sp
+    httptype host [port]
+
+.fi
+If port is omitted, 80 is used.
+.PP
+If no host file is specified through the --hosts file and no host is specified
+on the command line, httptype will read the list from standard input.
+
+.SS "Proxy servers:"
+.PP
+httptype will read the 
+.I http_proxy
+environment variable and try to determine if a proxy server is being used.
+This setting may be overridden using the 
+.I --proxy
+switch. A proxy server must be specified in the format:
+.I
+.sp
+  <fqdn | ip>:<port>
+
+.fi
+If the proxy  server is 
+.I none, 
+no proxy is used. This is typically used to prevent httptype from using the
+proxy server specified by 
+.I http_proxy.
+The
+.I --noproxy
+switch may also be used to disable proxy usage.
+.PP
+In case the proxy server requires authentication, 
+.I httptype
+will prompt the user for a username and password. The prompt is displayed on
+.B stderr
+so that it does not interfere with the actual output of httptype. This makes
+it easy to pipe the output of httptype to another program.
+
+.SS "Debugging and Tracing"
+The execution of httptype may be traced using the
+.I --trace
+switch. httptype will display its current state on stderr.
+.br
+The
+.I --debug
+switch is used to give more detailed error messages. It displays the function
+in which an error occurred, the line number and the call stack.
+
+.SH OPTIONS
+httptype accepts several switches at the command line. httptype will stop
+reading switches either when it finds something that is not a switch, or
+if it comes across a --
+.br
+Any switch that is not included here will be ignored.
+.TP
+.B
+--hosts [hostfile1[,hostfile2]]
+reads the list of hosts and ports from the file hostfile. If hostfile is - or
+omitted it reads from stdin. You may specify as many hostfiles as you want
+separated by commas.  You may also pass multiple hostfiles using a separate
+--hosts switch for each.
+.sp
+If you specify a host on the command line, as well as a list of hostfiles,
+httptype will first check the host passed on the command line, and will then
+try all hosts in the host file.  NOTE: the presence of the --hosts switch means
+that hosts will be read from a file or stdin, regardless of whether a host
+is passed on the command line, or through the --url switch.
+
+.TP
+.B
+--url url
+extracts the host and port from a specified url.  The url is in the format
+http://hostname[:port][/path/and/anything/else].
+.sp
+If a host is passed on the command line, as well as through the --url switch,
+both hosts will be polled.  This can also be used along with the --hosts
+switch.
+.sp
+This switch was added in version 1.3.7
+
+.TP
+.B
+--[no]showinput
+displays the input hostname as part of the output.  noshowinput negates it.
+
+.TP
+.B
+--[no]showreal
+displays the real hostname as part of the output.  If used with showinput
+displays the real hostname in braces after the input hostname.
+
+.TP
+.B
+--[no]showip
+displays the IP address of the host as part of the output.  If used with
+showinput displays 
+.B hostname/ip
+If used with showreal but without showinput, then displays
+.B real_hostname/ip
+
+.TP
+.B
+--proxy proxyhost[:proxyport] | none
+specifies a proxy server to use for connections to the internet. 
+.B none
+disables use of proxy. If proxyhost is omitted, httptype displays a warning
+and behaves as if proxyhost is none. If proxyport is omitted, httptype uses
+port 80. httptype can automatically determine if you use a proxy to access
+the internet by examining the 
+.I http_proxy
+environment variable. In such a case, you do not need to specify a proxy
+server using this switch. Using this switch however, overrides the settings
+of the 
+.I http_proxy
+variable. httptype will also examing the
+.I no_proxy
+environment variable to determine which hosts do not require a proxy server.
+
+.TP
+.B
+--noproxy
+disables the use of a proxy. Same as 
+.I --proxy none
+
+.TP
+.B
+--[no]serveronly
+In normal operation, httptype displays everything returned in the Server line
+of a http header. This switch causes httptype to display only the server type,
+suppressing other information like Operating System, compiled in modules etc 
+that may or may not be present.
+
+.TP
+.B
+--timeout time
+httptype will normally wait infinitely for a host to respond, or till the
+underlying network support system times out.  Using the timeout switch
+introduced in version 1.3.6, one can make httptype give up waiting for a host
+to respond after a specified interval.  The argument 'time' is in seconds.
+
+.TP
+.B
+--[no]debug
+Displays debugging information for errors and warnings.
+
+.TP
+.B
+--[no]trace
+Displays messages to trace the execution of httptype.
+
+.TP
+.B
+--copyright
+Displays copyright information and exits.
+
+.TP
+.B
+--warranty
+Displays warranty information and exits
+
+.TP
+.B
+--help
+Display this help and exits.
+
+.TP
+.B
+--version
+Displays version information and exits.
+
+.SH ENVIRONMENT
+.TP
+.I http_proxy
+Specifies a proxy server to be used for internet access. Overridden by the
+.B --proxy
+switch.
+.TP
+.I no_proxy
+Specifies hosts that do not require proxying.
+
+.SH FILES
+.I host file
+A host file specified through the
+.B --hosts
+switch must be in the following format:
+.br
+\- made up of comments, blank lines and host lines.
+.br
+\- comments are lines starting with a #
+.br
+\- blank lines consist of only linear white space
+.br
+\- host lines are in the following format:
+.B
+.sp
+    <hostname> [<separator> <port number>]
+
+.fi
+where 
+.B <hostname>
+is the fully qualified hostname name or the IP address of the host to be
+queried,
+.br
+.B <separator>
+is any combination of
+.B white space, colons (:)
+or
+.B commas (,)
+.br
+.B <port number>
+is the port on which the http server at 
+.B <hostname>
+is listening.
+.PP
+If <port number> is omitted, port 80 is assumed.
+.PP
+.SS "Example host file:"
+.sp
+.br
+.br
+# This is a sample host file
+.br
+www.linux.org
+.br
+www.gnu.org: , 80
+.br
+slashdot.org 80
+.br
+freshmeat.net:80
+.br
+www.fsf.org,80
+.fi
+
+.SH NOTES
+Be aware when piping the output of a command to \fBhttptype\fR. In case
+httptype requires proxy or origin server authentication, it will expect
+these values from \fIstdin\fR. If input is being piped from another
+program, the input stream is effectively redirected from this program and
+this program will have to provide authentication. 
+.PP
+The authentication prompts are written to \fIstderr\fR.
+.PP
+Also note that this is a development release. Some of the additions in this
+release may not be included in the stable release.
+
+.SH AUTHORS
+.sp
+Main program
+.br
+   Philip S Tellis <philip.tellis@iname.com>
+.br
+Proxy support
+.br
+   Binand Raj S <binand@bombay.retortsoft.com>
+.fi
+
+.SH BUGS
+Hopefully, all bugs in earlier versions have been fixed. If you find a bug
+that has not been fixed or any new bugs introduced in this version, please
+mail me at
+.br
+<philip.tellis@iname.com>
+.fi

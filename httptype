@@ -1,0 +1,558 @@
+#!/usr/bin/perl -w
+
+####
+#    
+#  httptype version 1.3.8
+#
+#    Copyright (c) 2000-2001, Philip Tellis
+#
+#    For copyright information: httptype --copyright
+#
+#    For warranty information: httptype --warranty
+#
+#    The GNU General Public Licence is outlined in the file Copying
+#    that accompanies this package.
+#
+#    See Changelog for changes to earlier versions
+#
+####
+
+use strict;
+use Socket qw(:DEFAULT :crlf);
+use Getopt::Long;
+
+my $version = "1.3.8";
+my $InputFile;
+my $method = "HEAD";         # if HEAD does not work, we may have to try GET.  This is a problem with some broken servers
+
+my %switches = extract_switches();
+
+
+
+############################
+# Now starts the program
+
+my ($iaddr, $paddr, $proto, $line, $realname, $ipaddr);
+my ($proxy_server, $proxy_addr, $proxy_port) = getproxysettings();
+my ($auth_required, $mimed) = (0, "");
+
+# Now, run through all hosts 
+trace("polling hosts...\n");
+
+my %host = &getnexthost();
+HOSTLOOP: while($host{'NAME'}) {
+
+	trace("checking $host{'NAME'}:$host{'PORT'}\n");
+	trace("is proxy required?\n");
+	my($remote, $port, $remotename) = 
+		to_proxy_or_not($host{'NAME'}, $host{'PORT'});
+
+# So now we have a host and a port to connect to.
+# Lets get this info in a manageable format.
+
+#################################################################
+## These lines are explained well in the PerlIPC manual page
+## perldoc perlipc or man perlipc to read about it.
+## look under the `Sockets: Client/Server Communication' section
+#################################################################
+
+# Run through once with the HEAD method, then with the GET method
+	do {
+		trace("trying to resolve $host{'NAME'}...");
+
+		$iaddr = inet_aton($remote) or do { 
+	 	   	warnnicely("Hostname lookup failure: $remote"); 
+			next; 
+		};
+		trace("done\n");
+		trace("Checking real name...");
+		$realname = gethostbyaddr($iaddr, PF_INET);
+		if ($realname) {
+			trace("$realname\n");
+		} else {
+			trace("none... using $host{'NAME'}\n");
+			$realname=$host{'NAME'};
+		}
+		trace("Checking IP address...");
+		$ipaddr = inet_ntoa($iaddr);
+		if ($ipaddr) {
+			trace("$ipaddr\n");
+		} else {
+			trace("none... something's wrong\n"); 
+		}
+										
+		$paddr = sockaddr_in($port, $iaddr);
+		$proto = getprotobyname('tcp');
+
+		# And connect to the socket.
+
+		trace("connecting to $remote:$port...\n");
+
+		socket(SOCK, PF_INET, SOCK_STREAM, $proto) or do {
+	   		warnnicely("Can't open socket on local machine"); 
+			next;
+		};
+		connect(SOCK, $paddr) or do {
+			warnnicely("Can't connect socket on $remote:$port"); 
+			next;
+		};
+
+		# Autoflush output.  Don't want no deadlocking.
+		select SOCK;  $|=1;  select STDOUT;
+
+# This is the magic line.
+# I use the HEAD method because all servers MUST support it.
+# It will reflect the values that were compiled into the server.
+# Any admin could change these values and recompile the server.
+
+		trace("requesting server type...\n");
+
+		trace("using $method method...\n");
+		print SOCK "$method $remotename HTTP/1.0$CRLF";
+
+		print SOCK "Host: $host{'NAME'}:$host{'PORT'}$CRLF";
+		print SOCK "User-Agent: HTTP_Server_Type/$version$CRLF";
+		print SOCK "Connection: close$CRLF";
+
+		do {
+			print SOCK "Proxy-Authorization: Basic $mimed$CRLF";
+			trace("authenticating proxy...\n");
+		} if $auth_required;
+
+		print SOCK $CRLF;      # End with a blank line.
+
+# The first line is the status line. It should be in the format:
+#    Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+#    HTTP-Version = HTTP/<major>.<minor>
+# If we get a different first line, then we don't have a HTTP server 
+# listening on the port.
+
+		trace("waiting for reply...\n");
+		eval { 
+			local $SIG{ALRM} = sub { die "alarm\n" }; 
+			alarm $switches{'timeout'}; 
+			$_=<SOCK>;
+			alarm 0;
+		}; 
+		if ($@) { 
+			warnnicely($@) if $@ ne "alarm\n";
+			warnnicely("Host $host{NAME} timed out...skipping") 
+				if $@ eq "alarm\n";
+			close SOCK or 
+				warnnicely("Could not close $host{'NAME'}");
+			next HOSTLOOP;
+		} 
+		trace("checking return header...\n");
+		if(!defined($_)) {
+			do {
+				$method="HEAD";
+				$_="NOT HTTP";
+			} if $method eq "GET";
+			do {
+				trace("nothing returned...possibly non-compliant host\n");
+				$method="GET";
+			} if $method eq "HEAD"; 
+		}
+	} until(defined($_));
+
+		do {
+			if($switches{'showinput'}) {
+				print $host{'NAME'};
+				print "/$ipaddr" if $switches{'showip'};
+				print " ($realname)" if $switches{'showreal'};
+				print ": ";
+			} elsif($switches{'showreal'}) {
+				print $realname;
+				print "/$ipaddr" if $switches{'showip'};
+				print ": ";
+			} else {
+				print "$ipaddr: " if $switches{'showip'};
+			}
+			print "not a http host$CRLF";
+			close SOCK or 
+				warnnicely("Could not close $host{'NAME'}");
+			next;
+		} unless (/^HTTP\/(\d+)\.(\d+)/o);
+
+# So now we are satisfied that it is a HTTP server
+# Let us see what the message from the proxy server (if there was one)
+# was - this is needed to check if proxy authentication is required.
+# Note that we only support the Basic type of authentication. Digest
+# type might come in a future release.
+# 407 is the HTTP error code for Proxy Authentication Required.
+# We should also look into the Proxy-Authenticate: header to check if
+# it is indeed Basic. Oh, Well...
+
+		if ($proxy_server) {
+			trace("checking if proxy authentication required...\n");
+			if (/407/) {
+				close SOCK or warnnicely("Could not close $host{'NAME'}");
+				$mimed = &getproxyauth($proxy_server);
+				$auth_required = 1;
+				redo;        # Retry with proxy authentication
+			}
+		}
+
+	# The server type line starts with `Server:' the rest of the 
+	# line may actually contain anything, but it's a good bet that 
+	# it contains at least the server type.
+	# Tomcat will return a Servlet-Engine: header, so we look for that
+	# too.
+
+		trace("extracting server type...\n");
+		while (<SOCK>) {
+			chomp;
+			do {
+				if($switches{'showinput'}) {
+					print $host{'NAME'};
+					print "/$ipaddr" if $switches{'showip'};
+					print " ($realname)" 
+						if $switches{'showreal'};
+					print ": ";
+				} elsif($switches{'showreal'}) {
+					print $realname;
+					print "/$ipaddr" if $switches{'showip'};
+					print ": ";
+				} else {
+					print "$ipaddr: " 
+						if $switches{'showip'};
+				}
+				print $1;
+				print $2 unless $switches{'serveronly'};
+				print $CRLF;
+				last;             # we can skip remaining input
+			} if /^Serv(?:er|let-Engine):\s*(.+?)(\s+.*)/io;
+		}
+		close SOCK  or warnnicely("Could not close $host{'NAME'}");
+
+	}
+	continue {
+		%host = &getnexthost();
+	} # end while getnexthost
+
+	trace("all done, exiting...\n");
+
+	exit;
+
+# End of main program
+########################
+
+##########################################################
+# user subroutines start here.  They are self explanatory
+
+sub help {
+	print <<EOF;
+Usage: httptype [OPTION]... [HOST [PORT]]
+Displays the HTTP server of the specified host.
+
+OPTIONS
+  --hosts [hostfile]   reads the list of hosts and ports from the file
+                       hostfile. If hostfile is - it reads from stdin.
+  --url url            extracts the host and port from a url
+  --showinput          displays the input hostname as part of the output
+  --noshowinput        suppresses display of hostname (default)
+  --showreal           shows the real name of the host.
+  --showip             shows the IP address of the host.
+  --proxy proxyhost[:proxyport]
+                       specifies a proxy server to use for connections to
+                       the internet. `none' disables use of proxy
+  --noproxy            disables the use of a proxy. Same as --proxy none
+  --serveronly         displays only the server type suppressing other 
+                       information
+  --timeout time       sets the timeout value for hosts to time.  Default is 
+                       no timeout.
+  --debug              displays debugging information for errors and warnings
+  --trace              traces the execution of httptype
+  --copyright          displays copyright information and exits
+  --warranty           displays warranty information and exits
+  --help               display this help and exits
+  --version            output version information and exits
+
+AUTHOR: Philip S Tellis
+
+Report bugs and comments to <philip.tellis\@iname.com>
+EOF
+;
+	exit;
+}
+
+sub version {
+	print "httptype $version$CRLF";
+	exit;
+}
+
+sub copyright {
+	print <<EOF;
+  Copyright (c) 2000, Philip Tellis
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 1, or (at your option)
+  any later version.
+EOF
+;
+	exit;
+}
+
+sub warranty {
+	print <<EOF;
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+EOF
+;
+	exit;
+}
+
+sub getnexthost() {
+
+	my ($host, $port) = (0, 0);
+
+	if ($switches{'host'}) {
+		($host, $port) = @switches{'host', 'port'};
+		trace("command line: $host:$port\n");
+		$switches{'host'}='';
+	} elsif ($switches{'url'}) {
+		($host, $port) = ($1, $2||80) 
+			if $switches{'url'} =~ m#http://([^/:]+)(?::(\d+))?#io;
+		trace("url: $host:$port\n");
+		$switches{'url'}='';
+	} elsif ($switches{'hostfile'}) {
+		while (defined($_=<>)) {
+			next if /^[\s\n\r\t]*$/o;    # Skip blank lines
+			next if /^#/o;               # Skip comment lines
+
+			s/^[\s\t]*(.+?)[\s\t\r\n]*$/$1/o;
+			tr/ ,/:/s;
+
+			($host, $port) = split /:+/;
+			$port = 80 unless $port;
+			trace("hostfile: $host:$port\n");
+
+			last;
+		}
+	}
+	if($port =~ /\D/) {
+		$port = getservbyname($port||"", 'tcp') || 80;
+	}
+	return (NAME=>$host, PORT=>$port);
+}
+
+#############################################################
+# gets a username and password for proxy authentication
+sub getproxyauth {
+
+	my $proxy_addr = shift || "localhost";
+	my $default_login_name = $ENV{'USER'} || $ENV{'LOGNAME'} 
+				|| (getpwent())[0] || `whoami`;
+	chomp $default_login_name;
+	print STDERR "The proxy server needs authentication.\n\n";
+	print STDERR "Login name on the proxy server $proxy_addr";
+	print STDERR $default_login_name ? " ($default_login_name): " : ": ";
+
+	my $login_name = <STDIN>;
+	chomp $login_name;
+	if ($login_name eq "") {
+		$login_name = $default_login_name;
+	}
+
+	&cbreak();
+	print STDERR "password: ";
+	my $password = <STDIN>;
+	print STDERR "\n";
+	&cooked();
+	chomp $password;
+
+	my $mimed = "$login_name:$password";
+
+	$mimed = pack("u", $mimed);
+	$mimed = substr($mimed,1);
+	$mimed =~ tr# -_`#A-Za-z0-9=#;
+		
+	return $mimed;
+}
+
+sub getproxysettings {
+
+# Is there a proxy server in the environment or passed through --proxy?
+
+	my ($proxy_server, $proxy_addr, $proxy_port) = (0);
+
+	trace("looking for proxy...");
+
+	if(!$switches{'noproxy'}) {
+		$proxy_server = $switches{'proxy'} || $ENV{'http_proxy'} || 0;
+	}
+	$switches{'no_proxy'} = $ENV{'no_proxy'}."," if $ENV{'no_proxy'};
+
+	trace("no proxy\n") unless $proxy_server;
+	trace("proxy found\n") if $proxy_server;
+
+# Remove any protocol part of proxy server.
+# We only care about the host and port
+	do {
+		$proxy_server =~ s#^.+?://##og;       # Remove http:// if any
+		$proxy_server =~ s#/##og;             # Remove any / from url
+
+# If it is equal to none, make it 0 
+# so that $proxy_server returns false;
+
+		$proxy_server =~ s/^none$/0/oi;       
+	} if ($proxy_server);
+
+# If there is, and it has not been set to none, then use it
+
+	if ($proxy_server) {
+		($proxy_addr, $proxy_port) = split /:/, $proxy_server;
+		$proxy_port = 80 unless $proxy_port;
+		if ($proxy_port =~ /\D/o) { 
+			$proxy_port = getservbyname($proxy_port, 'tcp') || 80;
+		}
+	}
+
+	($proxy_server, $proxy_addr, $proxy_port);
+}
+
+sub to_proxy_or_not {
+# If there is a proxy server and the host is not in the no_proxy list then
+	my $host = shift or warnnicely("No host to check for", 1);
+	my $port = shift or warnnicely("No port to return", 1);
+
+	if ($proxy_server && $switches{'no_proxy'} !~ /$host,/) {
+		return ($proxy_addr, $proxy_port, "http://$host:$port/");
+	} else {
+		return ($host, $port, "/");
+	}
+}
+
+sub extract_switches {
+	my %switches = (
+		hosts		=>	[],
+		url		=>	"none",
+		proxy		=>	"none",
+		noproxy		=>	0,
+		timeout		=>	"none",
+		showinput	=>	0,
+		showreal	=>	0,
+		showip		=>	0,
+		serveronly	=>	0,
+		debug		=>	0,
+		trace		=>	0
+	);
+
+	Getopt::Long::Configure("require_order", "pass_through");
+
+	GetOptions(
+		'hosts:s'	=>	$switches{'hosts'},
+		'url:s'		=>	\$switches{'url'},
+		'noproxy'	=>	\$switches{'noproxy'},
+		'proxy:s'	=>	\$switches{'proxy'},
+		'timeout:i'	=>	\$switches{'timeout'},
+		'showinput!'	=>	\$switches{'showinput'},
+		'showreal!'	=>	\$switches{'showreal'},
+		'showip!'	=>	\$switches{'showip'},
+		'serveronly!'	=>	\$switches{'serveronly'},
+		'debug!'	=>	\$switches{'debug'},
+		'trace!'	=>	\$switches{'trace'},
+
+		'help'		=>	\&help,
+		'version'	=>	\&version,
+		'copyright'	=>	\&copyright,
+		'warranty'	=>	\&warranty
+	);
+
+	for ('url', 'proxy', 'timeout') {
+		if(!$switches{$_}) {
+			warnnicely("No $_ specified with --$_ switch - ignoring", 1);
+			$switches{$_}=0;
+		}
+		$switches{$_} = 0 if($switches{$_} eq 'none');
+	}
+
+	for (@{$switches{'hosts'}}) {
+		$_ or $_="-";
+	}
+	@{$switches{'hosts'}} = split(/,/,join(',',@{$switches{'hosts'}}));
+
+	if(@ARGV) {
+		$switches{'host'} = shift @ARGV;
+		$switches{'port'} = shift @ARGV || 80;
+	}
+
+	if(@{$switches{'hosts'}} || !($switches{'host'} || $switches{'url'})) {
+		$switches{'hostfile'}=1; 
+	}
+
+#use Data::Dumper;
+#print Data::Dumper->Dump([\%switches]);
+#exit;
+	@ARGV=();
+	push @ARGV, @{$switches{'hosts'}} if @{$switches{'hosts'}};
+	delete $switches{'hosts'};
+
+	return %switches;
+}
+
+BEGIN {
+	use POSIX qw(:termios_h);
+
+	my ($term, $oterm, $echo, $noecho, $fd_stdin);
+
+	$fd_stdin = fileno(STDIN);
+
+	$term     = POSIX::Termios->new();
+	$term->getattr($fd_stdin);
+	$oterm    = $term->getlflag();
+
+	$echo     = ECHO | ECHOK | ICANON;
+	$noecho   = $oterm & ~$echo;
+
+	sub cbreak {
+		$term->setlflag($noecho);
+		$term->setcc(VTIME, 1);
+		$term->setattr($fd_stdin, TCSANOW);
+	}
+
+	sub cooked {
+		$term->setlflag($oterm);
+		$term->setcc(VTIME, 0);
+		$term->setattr($fd_stdin, TCSANOW);
+	}
+
+	sub dienicely {
+		use Carp;
+		my $message = shift || "Unknown error";
+		my $noerror = shift;
+		$message .= ": $!" if $switches{'debug'} && !$noerror;
+		$message .= "\n";
+		if ($switches{'debug'}) {
+			confess "Error: $message";
+		}
+		else {
+			print STDERR "Error: $message";
+			exit(1);
+		}
+	}
+
+	sub warnnicely {
+		use Carp qw(cluck);
+		my $message = shift || "Unknown warning";
+		my $noerror = shift;
+		$message .= ": $!" if $switches{'debug'} && !$noerror;
+		$message .= "\n";
+		if ($switches{'debug'}) {
+			cluck "Warning: $message";
+		}
+		else {
+			print STDERR "Warning: $message";
+		}
+	}
+
+	sub trace {
+		print STDERR @_ if $switches{'trace'};
+	}
+}
+END { cooked() }
+
+__END__
