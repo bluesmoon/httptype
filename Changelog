@@ -1,4 +1,5 @@
-version 1.3.9cvs (devel)
+26 August 2002
+version 1.3.9 (devel)
 
 - allow urls in host file
 - gives a warning on unsupported url schemes

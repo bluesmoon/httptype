@@ -1,4 +1,4 @@
-VERSION = 1.3.9cvs
+VERSION = 1.3.9
 
 ifndef PREFIX
 	PREFIX = /usr/local

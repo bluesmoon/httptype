@@ -2,7 +2,7 @@
 
 ####
 #    
-#  httptype version 1.3.9cvs
+#  httptype version 1.3.9
 #
 #    Copyright (c) 1999-2002, Philip Tellis
 #
@@ -21,7 +21,7 @@ use strict;
 use Socket qw(:DEFAULT :crlf);
 use Getopt::Long;
 
-my $version = "1.3.9cvs";
+my $version = "1.3.9";
 my $InputFile;
 my $method = "HEAD";         # if HEAD does not work, we may have to try GET.  This is a problem with some broken servers
 
