@@ -172,7 +172,7 @@ HOSTLOOP: while($host{'NAME'}) {
 			close SOCK or 
 				warnnicely("Could not close $host{'NAME'}");
 			next;
-		} unless (/^HTTP\/(\d+)\.(\d+)/o);
+		} unless (/^HTTP\/(\d+)\.(\d+)/);
 
 # So now we are satisfied that it is a HTTP server
 # Let us see what the message from the proxy server (if there was one)
@@ -221,7 +221,7 @@ HOSTLOOP: while($host{'NAME'}) {
 				print $2 unless $switches{'serveronly'};
 				print $CRLF;
 				last;             # we can skip remaining input
-			} if /^Serv(?:er|let-Engine):\s*(.+?)(\s+.*)/io;
+			} if /^Serv(?:er|let-Engine):\s*(.+?)(\s+.*)/i;
 		}
 		close SOCK  or warnnicely("Could not close $host{'NAME'}");
 
@@ -407,7 +407,7 @@ sub getproxysettings {
 # If it is equal to none, make it 0 
 # so that $proxy_server returns false;
 
-		$proxy_server =~ s/^none$/0/oi;       
+		$proxy_server =~ s/^none$/0/i;       
 	} if ($proxy_server);
 
 # If there is, and it has not been set to none, then use it
@@ -415,7 +415,7 @@ sub getproxysettings {
 	if ($proxy_server) {
 		($proxy_addr, $proxy_port) = split /:/, $proxy_server;
 		$proxy_port = 80 unless $proxy_port;
-		if ($proxy_port =~ /\D/o) { 
+		if ($proxy_port =~ /\D/) { 
 			$proxy_port = getservbyname($proxy_port, 'tcp') || 80;
 		}
 	}
