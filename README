@@ -31,6 +31,7 @@ Format of host file:
     <hostfile>    ::= <comments>
                       | <blank lines>
                       | <host lines>
+                      | <urls>
     <string>      ::= <char> | <char><string>
     <char>        ::= any of the 128 ASCII characters except <CR> and <LF>
     <comments>    ::= '#' <string> <LF>
@@ -41,6 +42,7 @@ Format of host file:
                       | <port name defined in services file>
     <separator>   ::= <LWS> | ':' | ','
     <host lines>  ::= <hostname> [<separator> <port number>] <LF>
+    <urls>        ::= http://<hostname>[:<port number>][/<string>]
 
 
 Author:
