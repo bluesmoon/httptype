@@ -314,13 +314,13 @@ sub getnexthost() {
 		trace("command line: $host:$port\n");
 		$switches{'host'}='';
 	} elsif ($switches{'url'}) {
-		if($switches{'url'} =~ m#([a-z]+)://#i && lc $1 ne 'http') {
+		if($switches{'url'} =~ m#([a-z]+)://#i && lc $1 !~ /https?/) {
 			warnnicely("Unsupported url scheme: $1, skipping");
 			$switches{'url'}='';
 			return &getnexthost;
 		}
 		($host, $port) = ($1, $2||80) 
-			if $switches{'url'} =~ m#http://([^/:]+)(?::(\d+))?#i;
+			if $switches{'url'} =~ m#https?://([^/:]+)(?::(\d+))?#i;
 		trace("url: $host:$port\n");
 		$switches{'url'}='';
 	} elsif ($switches{'hostfile'}) {
@@ -331,11 +331,11 @@ sub getnexthost() {
 #			s/^[\s\t]*(.+?)[\s\t\r\n]*$/$1/;
 			s/^\s+//;
 			s/\s+$//;
-			if(m#^([a-z]+)://# && lc $1 ne 'http') {
+			if(m#^([a-z]+)://# && lc $1 !~ /https?/) {
 				warnnicely("Unsupported url scheme: $1, skipping");
 				next;
 			}
-			s#^http://##;
+			s#^https?://##;
 			s#/.*$##;
 			tr/ ,/:/s;
 
